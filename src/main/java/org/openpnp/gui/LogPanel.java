@@ -1,32 +1,29 @@
 package org.openpnp.gui;
 
 import java.awt.BorderLayout;
-import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.HashMap;
 import java.util.prefs.Preferences;
 
-import javax.swing.AbstractAction;
-import javax.swing.Action;
-import javax.swing.ButtonGroup;
-import javax.swing.JButton;
-import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JRadioButtonMenuItem;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-import javax.swing.JToolBar;
+import javax.swing.*;
 
 import org.openpnp.gui.support.JTextLogWriter;
+import org.openpnp.logging.LogEntryListCellRenderer;
 import org.pmw.tinylog.Configurator;
 import org.pmw.tinylog.Level;
+import org.pmw.tinylog.LogEntry;
+import org.pmw.tinylog.Logger;
+
 import java.awt.event.ActionListener;
 
 public class LogPanel extends JPanel {
-    private JTextArea text;
+
     private JTextLogWriter writer;
+
+    private JScrollPane scrollPane;
+    private DefaultListModel<LogEntry> logEntries = new DefaultListModel<>();
 
     private Preferences prefs = Preferences.userNodeForPackage(LogPanel.class);
 
@@ -60,19 +57,38 @@ public class LogPanel extends JPanel {
         JButton btnClear = new JButton("Clear");
         btnClear.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                text.setText("");
+                logEntries.clear();
             }
         });
         toolBar.add(btnClear);
 
-        text = new JTextArea();
-        text.setFont(new Font("Monospaced", Font.PLAIN, 13));
-        text.setEditable(false);
-        text.setLineWrap(true);
-        add(new JScrollPane(text), BorderLayout.CENTER);
+        JButton btnScroll = new JButton("Scroll down");
+        btnClear.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                logEntries.clear();
+            }
+        });
+        toolBar.add(btnClear);
 
+        JList logEntryJList = new JList(logEntries);
+        logEntryJList.setCellRenderer(new LogEntryListCellRenderer());
 
-        writer = new JTextLogWriter(text);
+        logEntryJList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent mouseEvent) {
+                JList logEntryList = (JList) mouseEvent.getSource();
+                int index = logEntryList.locationToIndex(mouseEvent.getPoint());
+                if (index >= 0) {
+                    LogEntry entry  = (LogEntry) logEntryList.getModel().getElementAt(index);
+                    System.out.println("Double-clicked on: " + entry.getClassName());
+                }
+            }
+        });
+
+        scrollPane = new JScrollPane(logEntryJList);
+        add(scrollPane, BorderLayout.CENTER);
+
+        writer = new JTextLogWriter(logEntries);
         writer.setLineLimit(prefs.getInt(PREF_LOG_LINE_LIMIT, PREF_LOG_LINE_LIMIT_DEF));
         
         // This weird check is here because I mistakenly reused the same config key when

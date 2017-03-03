@@ -4,8 +4,7 @@ import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Set;
 
-import javax.swing.JTextArea;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 
 import org.pmw.tinylog.Configuration;
 import org.pmw.tinylog.LogEntry;
@@ -13,12 +12,12 @@ import org.pmw.tinylog.writers.LogEntryValue;
 import org.pmw.tinylog.writers.Writer;
 
 public class JTextLogWriter implements Writer {
-    private JTextArea textArea;
+    private DefaultListModel<LogEntry> logEntryList;
 
     private int lineLimit = 1000;
 
-    public JTextLogWriter(JTextArea textArea) {
-        this.textArea = textArea;
+    public JTextLogWriter(DefaultListModel<LogEntry>  logEntryList) {
+        this.logEntryList = logEntryList;
     }
 
     public void setLineLimit(int lineLimit) {
@@ -40,11 +39,8 @@ public class JTextLogWriter implements Writer {
 
     @Override
     public void write(final LogEntry logEntry) throws IOException {
-        String entry = logEntry.getRenderedLogEntry();
-        SwingUtilities.invokeLater(() -> {
-            textArea.append(entry);
-            trim();
-        });
+        this.logEntryList.addElement(logEntry);
+        trim();
     }
 
     @Override
@@ -55,11 +51,8 @@ public class JTextLogWriter implements Writer {
 
     private void trim() {
         try {
-            if (lineLimit > 0) {
-                while (textArea.getLineCount() > lineLimit + 1) {
-                    int end = textArea.getLineEndOffset(0);
-                    textArea.replaceRange("", 0, end);
-                }
+            if (lineLimit > 0 && (logEntryList.size() > lineLimit)) {
+                logEntryList.removeRange(0, logEntryList.size() - lineLimit);
             }
         }
         catch (Exception e) {
