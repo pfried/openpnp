@@ -1,29 +1,29 @@
 package org.openpnp.gui;
 
-import java.awt.BorderLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import org.openpnp.logging.LogEntryListCellRenderer;
+import org.openpnp.logging.LogEntryListModel;
+
+import java.awt.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
+import java.awt.event.*;
+
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.function.Predicate;
 import java.util.prefs.Preferences;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.event.ListDataEvent;
+import javax.swing.event.ListDataListener;
 
-import org.openpnp.gui.support.JTextLogWriter;
-import org.openpnp.logging.LogEntryListCellRenderer;
 import org.pmw.tinylog.Configurator;
 import org.pmw.tinylog.Level;
 import org.pmw.tinylog.LogEntry;
-import org.pmw.tinylog.Logger;
 
-import java.awt.event.ActionListener;
-
-public class LogPanel extends JPanel {
-
-    private JTextLogWriter writer;
-
-    private JScrollPane scrollPane;
-    private DefaultListModel<LogEntry> logEntries = new DefaultListModel<>();
+class LogPanel extends JPanel {
 
     private Preferences prefs = Preferences.userNodeForPackage(LogPanel.class);
 
@@ -32,6 +32,16 @@ public class LogPanel extends JPanel {
 
     private static final String PREF_LOG_LINE_LIMIT = "LogPanel.lineLimit";
     private static final int PREF_LOG_LINE_LIMIT_DEF = 1000;
+
+    private static final String PREF_LOG_AUTO_SCROLL = "LogPanel.autoScroll";
+    private static final boolean PREF_LOG_AUTO_SCROLL_DEF = true;
+    private boolean autoScroll = false;
+
+    private JTextField searchTextField;
+
+    private LogEntryListModel logEntries = new LogEntryListModel();
+
+    private Predicate<LogEntry> logLevelFilter = logEntry -> logEntry.getLevel().compareTo(Level.INFO) <= 0;
 
     HashMap<String, Integer> lineLimits = new HashMap<String, Integer>() {
         {
@@ -45,8 +55,41 @@ public class LogPanel extends JPanel {
     public LogPanel() {
         setLayout(new BorderLayout(0, 0));
 
+        JPanel toolBarAndSearch = new JPanel();
+        add(toolBarAndSearch, BorderLayout.NORTH);
+        toolBarAndSearch.setLayout(new BorderLayout(0, 0));
+
         JToolBar toolBar = new JToolBar();
-        add(toolBar, BorderLayout.NORTH);
+        toolBar.setFloatable(false);
+        toolBarAndSearch.add(toolBar);
+
+        JPanel panel_1 = new JPanel();
+        toolBarAndSearch.add(panel_1, BorderLayout.EAST);
+
+        JLabel lblSearch = new JLabel("Search");
+        panel_1.add(lblSearch);
+
+        searchTextField = new JTextField();
+        searchTextField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+
+            }
+
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+
+            }
+        });
+        panel_1.add(searchTextField);
+        searchTextField.setColumns(15);
+
+        logEntries.addFilter(logLevelFilter);
 
         JButton btnLineLimit = new JButton("Line Limit");
         toolBar.add(btnLineLimit);
@@ -55,23 +98,24 @@ public class LogPanel extends JPanel {
         toolBar.add(btnLogLevel);
         
         JButton btnClear = new JButton("Clear");
-        btnClear.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                logEntries.clear();
-            }
-        });
+        btnClear.addActionListener(e -> logEntries.clear());
+
         toolBar.add(btnClear);
 
-        JButton btnScroll = new JButton("Scroll down");
-        btnClear.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                logEntries.clear();
-            }
-        });
-        toolBar.add(btnClear);
+        JToggleButton btnScroll = new JToggleButton("Auto Scrolling");
+        autoScroll = prefs.getBoolean(PREF_LOG_AUTO_SCROLL, PREF_LOG_AUTO_SCROLL_DEF);
+        btnScroll.setSelected(autoScroll);
 
-        JList logEntryJList = new JList(logEntries);
+        btnScroll.addActionListener(e -> {
+            autoScroll = ((JToggleButton) e.getSource()).isSelected();
+            prefs.putBoolean(PREF_LOG_AUTO_SCROLL, autoScroll);
+        });
+
+        toolBar.add(btnScroll);
+
+        JList<LogEntry> logEntryJList = new JList<>(logEntries);
         logEntryJList.setCellRenderer(new LogEntryListCellRenderer());
+        logEntries.setLineLimit(prefs.getInt(PREF_LOG_LINE_LIMIT, PREF_LOG_LINE_LIMIT_DEF));
 
         logEntryJList.addMouseListener(new MouseAdapter() {
             @Override
@@ -80,16 +124,49 @@ public class LogPanel extends JPanel {
                 int index = logEntryList.locationToIndex(mouseEvent.getPoint());
                 if (index >= 0) {
                     LogEntry entry  = (LogEntry) logEntryList.getModel().getElementAt(index);
-                    System.out.println("Double-clicked on: " + entry.getClassName());
                 }
             }
         });
 
-        scrollPane = new JScrollPane(logEntryJList);
+        KeyStroke keystroke = KeyStroke.getKeyStroke(KeyEvent.VK_C, KeyEvent.CTRL_DOWN_MASK);
+
+        // On Copy Command (Ctrl + C) copy the actual text content of the LogEntries
+        logEntryJList.registerKeyboardAction(actionEvent -> {
+            ArrayList<LogEntry> logList = (ArrayList<LogEntry>) logEntryJList.getSelectedValuesList();
+            StringBuilder sb = new StringBuilder();
+            logList.forEach(logEntry -> sb.append(logEntry.getRenderedLogEntry()));
+            StringSelection selection = new StringSelection(sb.toString());
+            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+            clipboard.setContents(selection, selection);
+        }, keystroke, JComponent.WHEN_FOCUSED);
+
+        JScrollPane scrollPane = new JScrollPane(logEntryJList);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         add(scrollPane, BorderLayout.CENTER);
 
-        writer = new JTextLogWriter(logEntries);
-        writer.setLineLimit(prefs.getInt(PREF_LOG_LINE_LIMIT, PREF_LOG_LINE_LIMIT_DEF));
+        // Scroll down if enabled
+        logEntries.addListDataListener(new ListDataListener() {
+
+            private void scrollDown() {
+                if(autoScroll) {
+                    logEntryJList.ensureIndexIsVisible(logEntries.getSize() - 1);
+                }
+            }
+            @Override
+            public void intervalAdded(ListDataEvent e) {
+                scrollDown();
+            }
+
+            @Override
+            public void intervalRemoved(ListDataEvent e) {
+                scrollDown();
+            }
+
+            @Override
+            public void contentsChanged(ListDataEvent e) {
+                scrollDown();
+            }
+        });
         
         // This weird check is here because I mistakenly reused the same config key when
         // switching from slf to tinylog. This meant that some users had an int based
@@ -98,7 +175,7 @@ public class LogPanel extends JPanel {
         try {
             level = Level.valueOf(prefs.get(PREF_LOG_LEVEL, PREF_LOG_LEVEL_DEF));
         }
-        catch (Exception e) {
+        catch (Exception ignored) {
         }
         if (level == null ) {
             level = Level.INFO;
@@ -110,7 +187,7 @@ public class LogPanel extends JPanel {
             .activate();
         Configurator
             .currentConfig()
-            .addWriter(writer)
+            .addWriter(logEntries)
             .activate();
 
         JPopupMenu lineLimitPopupMenu = createLineLimitMenu();
@@ -172,6 +249,7 @@ public class LogPanel extends JPanel {
             String s = e.getActionCommand();
             prefs.put(PREF_LOG_LEVEL, s);
             Level level = Level.valueOf(s);
+
             Configurator
                 .currentConfig()
                 .level(level)
@@ -183,8 +261,8 @@ public class LogPanel extends JPanel {
         @Override
         public void actionPerformed(ActionEvent e) {
             int lineLimit = Integer.parseInt(e.getActionCommand());
+            logEntries.setLineLimit(lineLimit);
             prefs.putInt(PREF_LOG_LINE_LIMIT, lineLimit);
-            writer.setLineLimit(lineLimit);
         }
     };
 
