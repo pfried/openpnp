@@ -41,6 +41,7 @@ public class LogPanel extends JPanel {
 
     private LogEntryListModel logEntries = new LogEntryListModel();
     private JList<LogEntry> logEntryJList = new JList<>(logEntries);
+    private JScrollPane scrollPane = new JScrollPane(logEntryJList);
 
     private Level filterLogLevel = Level.TRACE;
     private LogEntryListModel.LogEntryFilter logLevelFilter = new LogEntryListModel.LogEntryFilter();
@@ -139,7 +140,7 @@ public class LogPanel extends JPanel {
             }
         });
 
-        JScrollPane scrollPane = new JScrollPane(logEntryJList);
+
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         add(scrollPane, BorderLayout.CENTER);
 
@@ -166,7 +167,16 @@ public class LogPanel extends JPanel {
 
     private void scrollDownLogPanel() {
         if (autoScroll) {
-            logEntryJList.ensureIndexIsVisible(logEntries.getSize() - 1);
+            JScrollBar verticalBar = scrollPane.getVerticalScrollBar();
+            AdjustmentListener downScroller = new AdjustmentListener() {
+                @Override
+                public void adjustmentValueChanged(AdjustmentEvent e) {
+                    Adjustable adjustable = e.getAdjustable();
+                    adjustable.setValue(adjustable.getMaximum());
+                    verticalBar.removeAdjustmentListener(this);
+                }
+            };
+            verticalBar.addAdjustmentListener(downScroller);
         }
     }
 
