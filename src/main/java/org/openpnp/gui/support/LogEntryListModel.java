@@ -91,10 +91,10 @@ public class LogEntryListModel extends AbstractListModel<LogEntry> implements Wr
     }
 
     public void filter() {
+        Predicate<LogEntry> allFilters = filters.stream().map(LogEntryFilter::getFilter).reduce(Predicate::and).orElse(t -> false);
+
         // Reduce all filters to a single one and apply it to our logEntries
-        this.filteredLogEntries = originalLogEntries.stream().filter(
-                filters.stream().map(LogEntryFilter::getFilter).reduce(Predicate::and).orElse(t -> false)
-        ).collect(Collectors.toList());
+        this.filteredLogEntries = originalLogEntries.parallelStream().filter(allFilters).collect(Collectors.toList());
 
         SwingUtilities.invokeLater(() -> fireContentsChanged(this, 0, filteredLogEntries.size() - 1));
     }
