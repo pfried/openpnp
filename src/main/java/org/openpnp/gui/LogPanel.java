@@ -18,8 +18,6 @@ import javax.swing.border.EtchedBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.event.ListDataEvent;
-import javax.swing.event.ListDataListener;
 
 import org.openpnp.logging.SystemLogger;
 import org.pmw.tinylog.Configurator;
@@ -41,7 +39,6 @@ public class LogPanel extends JPanel {
 
     private LogEntryListModel logEntries = new LogEntryListModel();
     private JList<LogEntry> logEntryJList = new JList<>(logEntries);
-    private JScrollPane scrollPane = new JScrollPane(logEntryJList);
 
     private Level filterLogLevel = Level.TRACE;
     private LogEntryListModel.LogEntryFilter logLevelFilter = new LogEntryListModel.LogEntryFilter();
@@ -115,9 +112,6 @@ public class LogPanel extends JPanel {
 
         btnScroll.addActionListener(e -> {
             autoScroll = ((JToggleButton) e.getSource()).isSelected();
-            if (autoScroll) {
-                scrollDownLogPanel();
-            }
             prefs.putBoolean(PREF_LOG_AUTO_SCROLL, autoScroll);
         });
 
@@ -141,43 +135,18 @@ public class LogPanel extends JPanel {
         });
 
 
+        JScrollPane scrollPane = new JScrollPane(logEntryJList);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         add(scrollPane, BorderLayout.CENTER);
 
-        // Scroll down if enabled
-        logEntries.addListDataListener(new ListDataListener() {
-
-            @Override
-            public void intervalAdded(ListDataEvent e) {
-                scrollDownLogPanel();
+        JScrollBar verticalBar = scrollPane.getVerticalScrollBar();
+        AdjustmentListener downScroller = e -> {
+            if(autoScroll) {
+                Adjustable adjustable = e.getAdjustable();
+                adjustable.setValue(adjustable.getMaximum());
             }
-
-            @Override
-            public void intervalRemoved(ListDataEvent e) {
-                scrollDownLogPanel();
-            }
-
-            @Override
-            public void contentsChanged(ListDataEvent e) {
-                scrollDownLogPanel();
-            }
-        });
-
-    }
-
-    private void scrollDownLogPanel() {
-        if (autoScroll) {
-            JScrollBar verticalBar = scrollPane.getVerticalScrollBar();
-            AdjustmentListener downScroller = new AdjustmentListener() {
-                @Override
-                public void adjustmentValueChanged(AdjustmentEvent e) {
-                    Adjustable adjustable = e.getAdjustable();
-                    adjustable.setValue(adjustable.getMaximum());
-                    verticalBar.removeAdjustmentListener(this);
-                }
-            };
-            verticalBar.addAdjustmentListener(downScroller);
-        }
+        };
+        verticalBar.addAdjustmentListener(downScroller);
     }
 
     private JCheckBox createSystemOutputCheckbox() {
